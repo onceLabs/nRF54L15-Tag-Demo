@@ -1,0 +1,14 @@
+# nRF54L15 Tag Demo application configuration
+
+menu "Tag Demo"
+
+rsource "src/sensors/Kconfig"
+rsource "src/ble/Kconfig"
+rsource "src/cs/Kconfig"
+rsource "src/ess/Kconfig"
+rsource "src/motion/Kconfig"
+rsource "src/control/Kconfig"
+
+endmenu
+
+source "Kconfig.zephyr"

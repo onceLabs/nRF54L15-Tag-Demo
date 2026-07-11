@@ -1,0 +1,7 @@
+config APP_CONTROL
+	bool "Runtime control shell (cs role/mode/start/stop)"
+	default y
+	depends on SHELL
+	help
+	  Registers shell commands to select the Channel Sounding role and
+	  ranging mode and to start/stop ranging at runtime.

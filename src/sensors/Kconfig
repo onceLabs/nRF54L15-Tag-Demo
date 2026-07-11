@@ -1,0 +1,18 @@
+config APP_SENSORS
+	bool "Onboard sensor sampling (BME688, ADXL367, BMI270)"
+	default y
+	depends on SENSOR
+	help
+	  Periodically sample the onboard environmental sensor, accelerometer
+	  and IMU and log the readings.
+
+if APP_SENSORS
+
+config APP_SENSORS_SAMPLE_INTERVAL_MS
+	int "Sensor sample interval (ms)"
+	default 1000
+	range 50 60000
+	help
+	  Period between sensor sampling passes.
+
+endif # APP_SENSORS

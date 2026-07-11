@@ -1,0 +1,43 @@
+config APP_CS
+	bool "Channel Sounding (dual-role, RAS + inline-PCT)"
+	default y
+	depends on BT_CHANNEL_SOUNDING
+	help
+	  Bluetooth Channel Sounding demo supporting both initiator and
+	  reflector roles and both RAS (GATT Ranging Service) and inline-PCT
+	  (IPT) transports, switchable at runtime.
+
+if APP_CS
+
+choice APP_CS_DEFAULT_ROLE
+	prompt "Default CS role at boot"
+	default APP_CS_DEFAULT_ROLE_REFLECTOR
+
+config APP_CS_DEFAULT_ROLE_INITIATOR
+	bool "Initiator (central, computes distance)"
+
+config APP_CS_DEFAULT_ROLE_REFLECTOR
+	bool "Reflector (peripheral, being located)"
+
+endchoice
+
+choice APP_CS_DEFAULT_MODE
+	prompt "Default CS ranging mode at boot"
+	default APP_CS_DEFAULT_MODE_RAS
+
+config APP_CS_DEFAULT_MODE_RAS
+	bool "RAS (GATT Ranging Service transfer)"
+
+config APP_CS_DEFAULT_MODE_IPT
+	bool "IPT (inline PCT, local estimation)"
+
+endchoice
+
+config APP_CS_AUTOSTART
+	bool "Start Channel Sounding automatically at boot"
+	default y
+	help
+	  Start ranging with the default role/mode at boot, without waiting
+	  for a `cs start` shell command. Disable to require manual start.
+
+endif # APP_CS

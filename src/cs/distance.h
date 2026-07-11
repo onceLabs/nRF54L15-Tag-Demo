@@ -1,0 +1,26 @@
+/*
+ * Distance-estimate post-processing: per-antenna-path sliding-window median
+ * over the raw cs_de outputs. Ported from the ras_initiator reference.
+ */
+#ifndef APP_DISTANCE_H_
+#define APP_DISTANCE_H_
+
+#include <zephyr/kernel.h>
+#include <bluetooth/cs_de.h>
+
+/* Buffers are sized for the largest antenna-path count the build supports. */
+#define DE_MAX_AP CONFIG_BT_CS_DE_MAX_NUM_ANTENNA_PATHS
+
+/** @brief Clear all sliding windows (call on (re)connect). */
+void distance_reset(void);
+
+/** @brief Append one estimate for antenna path @p ap to its window. */
+void distance_store(uint8_t ap, const cs_de_dist_estimates_t *estimates);
+
+/** @brief Median (over finite samples) of antenna path @p ap's window. */
+cs_de_dist_estimates_t distance_get(uint8_t ap);
+
+/** @brief Number of samples currently held for antenna path @p ap. */
+uint8_t distance_count(uint8_t ap);
+
+#endif /* APP_DISTANCE_H_ */

@@ -1,0 +1,7 @@
+config APP_BLE_CORE
+	bool "Bluetooth core (enable stack, connection & security handling)"
+	default y
+	depends on BT
+	help
+	  Brings up the Bluetooth stack and provides shared connection and
+	  security callbacks used by the Channel Sounding modules.

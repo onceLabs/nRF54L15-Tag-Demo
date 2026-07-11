@@ -1,0 +1,18 @@
+config APP_ESS
+	bool "Environmental Sensing Service (SIG, 0x181A)"
+	default y
+	depends on BT_PERIPHERAL
+	help
+	  Expose the BME688 temperature, humidity and pressure over the
+	  Bluetooth SIG Environmental Sensing Service (read + notify).
+
+if APP_ESS
+
+config APP_ESS_NOTIFY_INTERVAL_MS
+	int "ESS notification interval (ms)"
+	default 1000
+	range 100 60000
+	help
+	  Period at which subscribed ESS characteristics are notified.
+
+endif # APP_ESS

@@ -1,0 +1,24 @@
+config APP_MOTION
+	bool "Custom BLE Motion Service (accel + gyro streaming)"
+	default y
+	depends on BT_PERIPHERAL
+	help
+	  Custom 128-bit GATT service streaming high-rate accelerometer and
+	  gyroscope samples via notifications, draining the IMU stream queue.
+
+if APP_MOTION
+
+config APP_MOTION_CONN_INTERVAL_MIN
+	int "Requested min connection interval (1.25 ms units)"
+	default 6
+	range 6 3200
+	help
+	  Requested on subscribe via bt_conn_le_param_update. 6 = 7.5 ms
+	  (BLE standard minimum). Sub-7.5 ms requires controller/central support.
+
+config APP_MOTION_CONN_INTERVAL_MAX
+	int "Requested max connection interval (1.25 ms units)"
+	default 6
+	range 6 3200
+
+endif # APP_MOTION
