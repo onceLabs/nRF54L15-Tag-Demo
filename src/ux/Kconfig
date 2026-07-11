@@ -1,0 +1,24 @@
+config APP_UX
+	bool "Button + RGB-LED UX for the two-tag CS demo"
+	default y
+	depends on APP_CS && DK_LIBRARY
+	help
+	  Button cycles the Channel Sounding role (Off/Reflector/Initiator) and
+	  the RGB LED shows the role and, once the initiator is ranging, the
+	  distance (color zone + blink rate).
+
+if APP_UX
+
+config APP_UX_NEAR_MM
+	int "Near/mid distance threshold (mm)"
+	default 1000
+	help
+	  Distance below this shows green.
+
+config APP_UX_FAR_MM
+	int "Mid/far distance threshold (mm)"
+	default 3000
+	help
+	  Distance below this shows yellow; at or above, red.
+
+endif # APP_UX

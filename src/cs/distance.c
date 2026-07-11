@@ -10,8 +10,6 @@
 
 LOG_MODULE_DECLARE(app_cs, CONFIG_LOG_DEFAULT_LEVEL);
 
-#define DE_SLIDING_WINDOW_SIZE 9
-
 struct de_buffer {
 	cs_de_dist_estimates_t estimates[DE_SLIDING_WINDOW_SIZE];
 	uint8_t num_valid;
@@ -77,7 +75,7 @@ static float median_inplace(int count, float *values)
 	return values[count / 2];
 }
 
-cs_de_dist_estimates_t distance_get(uint8_t ap)
+cs_de_dist_estimates_t distance_get_recent(uint8_t ap, uint8_t n)
 {
 	cs_de_dist_estimates_t out = {0};
 	float tmp_ifft[DE_SLIDING_WINDOW_SIZE];
@@ -93,8 +91,15 @@ cs_de_dist_estimates_t distance_get(uint8_t ap)
 	k_mutex_lock(&buffers_mutex, K_FOREVER);
 
 	struct de_buffer *b = &buffers[ap];
+	uint8_t take = MIN(n, b->num_valid);
 
-	for (uint8_t i = 0; i < b->num_valid; i++) {
+	/* Walk backwards from the most recent entry (index points at the next
+	 * write slot) to gather the newest `take` samples.
+	 */
+	for (uint8_t k = 0; k < take; k++) {
+		uint8_t i = (b->index + DE_SLIDING_WINDOW_SIZE - 1 - k) %
+			    DE_SLIDING_WINDOW_SIZE;
+
 		if (isfinite(b->estimates[i].ifft)) {
 			tmp_ifft[n_ifft++] = b->estimates[i].ifft;
 		}
@@ -114,4 +119,9 @@ cs_de_dist_estimates_t distance_get(uint8_t ap)
 	out.best = NAN;
 
 	return out;
+}
+
+cs_de_dist_estimates_t distance_get(uint8_t ap)
+{
+	return distance_get_recent(ap, DE_SLIDING_WINDOW_SIZE);
 }

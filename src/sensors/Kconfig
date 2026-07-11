@@ -15,4 +15,26 @@ config APP_SENSORS_SAMPLE_INTERVAL_MS
 	help
 	  Period between sensor sampling passes.
 
+config APP_SENSORS_STATIONARY_RATE_HZ
+	int "Stationarity monitor sample rate (Hz)"
+	default 25
+	range 1 200
+	help
+	  Rate at which the ADXL367 is polled to detect motion for
+	  sensors_is_stationary().
+
+config APP_SENSORS_STATIONARY_WINDOW
+	int "Stationarity variance window (samples)"
+	default 25
+	range 4 128
+	help
+	  Number of recent accel-magnitude samples used for the variance test.
+
+config APP_SENSORS_STATIONARY_THRESH_MMS2
+	int "Stationarity threshold (milli-m/s^2 std-dev)"
+	default 300
+	help
+	  Below this accel-magnitude standard deviation the tag is considered
+	  stationary. 300 = 0.3 m/s^2.
+
 endif # APP_SENSORS

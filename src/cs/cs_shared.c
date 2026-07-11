@@ -9,9 +9,15 @@
 #include "cs_initiator.h"
 #include "cs_reflector.h"
 
+#include <math.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(app_cs, CONFIG_LOG_DEFAULT_LEVEL);
+
+#define CS_DISTANCE_STALE_MS 2000
+
+static float m_distance = NAN;
+static int64_t m_distance_ts;
 
 static enum cs_role m_role =
 	IS_ENABLED(CONFIG_APP_CS_DEFAULT_ROLE_INITIATOR) ?
@@ -139,6 +145,25 @@ int cs_stop(void)
 
 	(m_role == CS_ROLE_INITIATOR) ? cs_initiator_stop() : cs_reflector_stop();
 	m_running = false;
+	m_distance = NAN;
 	LOG_INF("cs: stopped");
 	return 0;
+}
+
+void cs_report_distance(float meters)
+{
+	m_distance = meters;
+	m_distance_ts = k_uptime_get();
+}
+
+bool cs_get_distance(float *meters_out)
+{
+	if (isnan(m_distance)) {
+		return false;
+	}
+	if (k_uptime_get() - m_distance_ts > CS_DISTANCE_STALE_MS) {
+		return false;
+	}
+	*meters_out = m_distance;
+	return true;
 }

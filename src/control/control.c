@@ -303,6 +303,8 @@ static int cmd_sensor_status(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "stream    %s  poll %s  measured %u Hz  dropped %u",
 		    sensors_stream_active() ? "active" : "idle", poll_str,
 		    sensors_stream_rate_hz(), sensors_stream_dropped());
+	shell_print(sh, "motion    %s",
+		    sensors_is_stationary() ? "stationary" : "moving");
 	return 0;
 }
 

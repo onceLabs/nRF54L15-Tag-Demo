@@ -55,6 +55,14 @@ struct env_reading {
 int sensors_get_env(struct env_reading *out);
 
 /**
+ * @brief Whether the tag is currently stationary (low accel-magnitude variance).
+ *
+ * Motion/stationarity indicator derived from the ADXL367; used to adapt the
+ * CS distance filter. Not a displacement source.
+ */
+bool sensors_is_stationary(void);
+
+/**
  * @brief Runtime-configurable motion channels.
  *
  * The IMU's accelerometer and gyroscope are independent channels. This is the
@@ -152,6 +160,11 @@ uint32_t sensors_stream_dropped(void);
 static inline int sensors_init(void)
 {
 	return 0;
+}
+
+static inline bool sensors_is_stationary(void)
+{
+	return false; /* assume moving -> no adaptive filtering */
 }
 
 #endif /* CONFIG_APP_SENSORS */

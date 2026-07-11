@@ -48,6 +48,17 @@ int cs_start(void);
 /** @brief Stop any active CS activity and disconnect. */
 int cs_stop(void);
 
+/** @brief Publish the latest computed distance (called by the initiator). */
+void cs_report_distance(float meters);
+
+/**
+ * @brief Get the latest distance if fresh.
+ *
+ * @return true and writes @p meters_out if a distance was reported within the
+ *         last ~2 s; false otherwise (never measured, stale, or stopped).
+ */
+bool cs_get_distance(float *meters_out);
+
 #else
 
 static inline int cs_init(void)

@@ -13,6 +13,7 @@
 #include "cs/cs_shared.h"
 #include "ess/ess.h"
 #include "motion/motion.h"
+#include "ux/ux.h"
 
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -45,6 +46,11 @@ int main(void)
 	err = motion_init();
 	if (err) {
 		LOG_ERR("motion_init failed (%d)", err);
+	}
+
+	err = ux_init();
+	if (err) {
+		LOG_ERR("ux_init failed (%d)", err);
 	}
 
 	LOG_INF("nRF54L15 Tag Demo ready");

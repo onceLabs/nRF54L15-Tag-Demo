@@ -5,7 +5,8 @@
  *   - enables the stack (and loads settings when bonding is configured),
  *   - elevates each connection to encrypted (L2) security (required by CS),
  *   - tracks the current connection and exposes it via ble_current_conn(),
- *   - drives the status LED on connect/disconnect.
+ *   - drives the status LED on connect/disconnect (unless the UX module owns
+ *     the RGB LED, i.e. CONFIG_APP_UX).
  *
  * Scanning/advertising and the CS handshake live in the role modules, which
  * register their own connection callbacks alongside these.
@@ -19,9 +20,6 @@
 
 LOG_MODULE_REGISTER(app_ble_core, CONFIG_LOG_DEFAULT_LEVEL);
 
-static const struct gpio_dt_spec status_led =
-	GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios, {0});
-
 static struct bt_conn *current_conn;
 
 struct bt_conn *ble_current_conn(void)
@@ -29,12 +27,23 @@ struct bt_conn *ble_current_conn(void)
 	return current_conn;
 }
 
+#if !IS_ENABLED(CONFIG_APP_UX)
+/* The UX module (when present) owns the RGB LED, incl. led0/led1_blue. */
+static const struct gpio_dt_spec status_led =
+	GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios, {0});
+
 static void led_set(bool on)
 {
 	if (status_led.port) {
 		gpio_pin_set_dt(&status_led, on ? 1 : 0);
 	}
 }
+#else
+static inline void led_set(bool on)
+{
+	ARG_UNUSED(on);
+}
+#endif
 
 static void connected(struct bt_conn *conn, uint8_t err)
 {
@@ -96,6 +105,7 @@ int ble_core_init(void)
 {
 	int err;
 
+#if !IS_ENABLED(CONFIG_APP_UX)
 	if (status_led.port) {
 		if (!gpio_is_ready_dt(&status_led)) {
 			LOG_WRN("status LED not ready");
@@ -103,6 +113,7 @@ int ble_core_init(void)
 			gpio_pin_configure_dt(&status_led, GPIO_OUTPUT_INACTIVE);
 		}
 	}
+#endif
 
 	err = bt_enable(NULL);
 	if (err) {

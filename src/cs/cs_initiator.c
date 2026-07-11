@@ -21,6 +21,7 @@
 #include "cs_shared.h"
 #include "distance.h"
 #include "ble_core.h"
+#include "sensors.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -93,6 +94,27 @@ static struct k_work ipt_distance_work;
 static bool initiator_active(void)
 {
 	return active && cs_get_role() == CS_ROLE_INITIATOR;
+}
+
+/* Store a new estimate, with accelerometer-assisted outlier rejection: while
+ * the tag is stationary, drop estimates that jump implausibly far from the
+ * current median (multipath spikes).
+ */
+static void submit_distance(uint8_t ap, const cs_de_dist_estimates_t *est)
+{
+#if IS_ENABLED(CONFIG_APP_CS_STABILIZE)
+	if (sensors_is_stationary() && distance_count(ap) >= 3) {
+		cs_de_dist_estimates_t cur =
+			distance_get_recent(ap, DE_SLIDING_WINDOW_SIZE);
+		float gate = CONFIG_APP_CS_STAB_GATE_MM / 1000.0f;
+
+		if (isfinite(cur.ifft) && isfinite(est->ifft) &&
+		    fabsf(est->ifft - cur.ifft) > gate) {
+			return; /* reject spike while stationary */
+		}
+	}
+#endif
+	distance_store(ap, est);
 }
 
 /* ========================================================================= */
@@ -295,7 +317,7 @@ static void ras_ranging_data_cb(struct bt_conn *conn, uint16_t ranging_counter, 
 	for (uint8_t ap = 0; ap < m_cs_de_report.n_ap; ap++) {
 		if (m_cs_de_report.tone_quality[ap] == CS_DE_TONE_QUALITY_OK ||
 		    isfinite(m_cs_de_report.distance_estimates[ap].rtt)) {
-			distance_store(ap, &m_cs_de_report.distance_estimates[ap]);
+			submit_distance(ap, &m_cs_de_report.distance_estimates[ap]);
 		}
 	}
 	k_sem_give(&sem_distance_estimate_updated);
@@ -436,7 +458,7 @@ static void ipt_distance_work_handler(struct k_work *work)
 		};
 
 		last_n_ap = 1;
-		distance_store(0, &est);
+		submit_distance(0, &est);
 		k_sem_give(&sem_distance_estimate_updated);
 	}
 }
@@ -895,20 +917,48 @@ static int run_session(struct bt_conn *conn, enum cs_mode mode, uint16_t conn_in
 	return 0;
 }
 
+/* Apply the static calibration offset (RF/antenna path bias), clamped >= 0. */
+static float apply_offset(float m)
+{
+	if (!isfinite(m)) {
+		return m; /* preserve NaN */
+	}
+
+	float v = m + (CONFIG_APP_CS_DISTANCE_OFFSET_MM / 1000.0f);
+
+	return v < 0.0f ? 0.0f : v;
+}
+
 static void print_distances(enum cs_mode mode)
 {
+	uint8_t win = DE_SLIDING_WINDOW_SIZE;
+
+#if IS_ENABLED(CONFIG_APP_CS_STABILIZE)
+	/* Stationary: full window (steady). Moving: short window (responsive). */
+	win = sensors_is_stationary() ? DE_SLIDING_WINDOW_SIZE
+				      : CONFIG_APP_CS_STAB_WINDOW_MOVING;
+#endif
+
 	for (uint8_t ap = 0; ap < last_n_ap && ap < DE_MAX_AP; ap++) {
 		if (distance_count(ap) == 0) {
 			continue;
 		}
 
-		cs_de_dist_estimates_t d = distance_get(ap);
+		cs_de_dist_estimates_t d = distance_get_recent(ap, win);
+		float ifft = apply_offset(d.ifft);
+		float phase_slope = apply_offset(d.phase_slope);
+		float rtt = apply_offset(d.rtt);
 
 		if (mode == CS_MODE_IPT) {
-			LOG_INF("distance[ap%u]: ifft %.2f m", ap, (double)d.ifft);
+			LOG_INF("distance[ap%u]: ifft %.2f m", ap, (double)ifft);
 		} else {
 			LOG_INF("distance[ap%u]: ifft %.2f  phase_slope %.2f  rtt %.2f m",
-				ap, (double)d.ifft, (double)d.phase_slope, (double)d.rtt);
+				ap, (double)ifft, (double)phase_slope, (double)rtt);
+		}
+
+		/* Publish antenna path 0's ifft distance for the LED UX. */
+		if (ap == 0 && isfinite(ifft)) {
+			cs_report_distance(ifft);
 		}
 	}
 }

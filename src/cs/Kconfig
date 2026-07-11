@@ -23,7 +23,7 @@ endchoice
 
 choice APP_CS_DEFAULT_MODE
 	prompt "Default CS ranging mode at boot"
-	default APP_CS_DEFAULT_MODE_RAS
+	default APP_CS_DEFAULT_MODE_IPT
 
 config APP_CS_DEFAULT_MODE_RAS
 	bool "RAS (GATT Ranging Service transfer)"
@@ -35,9 +35,48 @@ endchoice
 
 config APP_CS_AUTOSTART
 	bool "Start Channel Sounding automatically at boot"
+	default n if APP_UX
 	default y
 	help
 	  Start ranging with the default role/mode at boot, without waiting
 	  for a `cs start` shell command. Disable to require manual start.
+
+config APP_CS_DISTANCE_OFFSET_MM
+	int "Static distance calibration offset (mm), added to every estimate"
+	default -914
+	range -10000 10000
+	help
+	  Fixed RF/antenna-path bias correction added to each distance estimate
+	  before it is logged/reported. Default -914 mm (approx -3 ft) cancels
+	  the ~1 m bias two adjacent tags report. The corrected value is clamped
+	  to be non-negative.
+
+config APP_CS_STABILIZE
+	bool "Accelerometer-assisted distance stabilization"
+	default y
+	depends on APP_SENSORS
+	help
+	  Use the initiator's accelerometer (sensors_is_stationary) to adapt the
+	  distance filter: when stationary, use the full median window and reject
+	  physically-impossible jumps; when moving, use a short window to track.
+
+if APP_CS_STABILIZE
+
+config APP_CS_STAB_GATE_MM
+	int "Stationary outlier-rejection gate (mm)"
+	default 1000
+	help
+	  While stationary, a new estimate deviating from the current median by
+	  more than this is treated as a spike and dropped.
+
+config APP_CS_STAB_WINDOW_MOVING
+	int "Median window size while moving (samples)"
+	default 3
+	range 1 9
+	help
+	  Smaller window = more responsive while moving. Stationary always uses
+	  the full window.
+
+endif # APP_CS_STABILIZE
 
 endif # APP_CS

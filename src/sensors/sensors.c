@@ -11,6 +11,7 @@
  */
 #include "sensors.h"
 
+#include <math.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/sys/atomic.h>
@@ -91,6 +92,92 @@ int sensors_get_env(struct env_reading *out)
 
 	return ret;
 }
+
+/* --- Stationarity monitor (ADXL367 accel-magnitude variance) -------------- */
+
+static atomic_t m_stationary; /* 0 = moving/unknown, 1 = stationary */
+
+bool sensors_is_stationary(void)
+{
+	return atomic_get(&m_stationary) != 0;
+}
+
+/* Read the ADXL367 acceleration in m/s^2 under the bus mutex. */
+static int read_accel_ms2(float v[3])
+{
+	struct sensor_value acc[3];
+	int err;
+
+	k_mutex_lock(&sensor_mtx, K_FOREVER);
+	err = sensor_sample_fetch(accel_dev);
+	if (!err) {
+		sensor_channel_get(accel_dev, SENSOR_CHAN_ACCEL_XYZ, acc);
+	}
+	k_mutex_unlock(&sensor_mtx);
+
+	if (err) {
+		return err;
+	}
+
+	v[0] = (float)sensor_value_to_double(&acc[0]);
+	v[1] = (float)sensor_value_to_double(&acc[1]);
+	v[2] = (float)sensor_value_to_double(&acc[2]);
+	return 0;
+}
+
+static void stationarity_thread(void *p1, void *p2, void *p3)
+{
+	ARG_UNUSED(p1);
+	ARG_UNUSED(p2);
+	ARG_UNUSED(p3);
+
+	static float mags[CONFIG_APP_SENSORS_STATIONARY_WINDOW];
+	uint8_t count = 0;
+	uint8_t idx = 0;
+	const k_timeout_t period =
+		K_MSEC(1000 / CONFIG_APP_SENSORS_STATIONARY_RATE_HZ);
+	const float thr = CONFIG_APP_SENSORS_STATIONARY_THRESH_MMS2 / 1000.0f;
+
+	while (1) {
+		float v[3];
+
+		if (!device_is_ready(accel_dev) || read_accel_ms2(v) != 0) {
+			k_sleep(K_MSEC(500));
+			continue;
+		}
+
+		mags[idx] = sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+		idx = (idx + 1) % CONFIG_APP_SENSORS_STATIONARY_WINDOW;
+		if (count < CONFIG_APP_SENSORS_STATIONARY_WINDOW) {
+			count++;
+		}
+
+		if (count >= CONFIG_APP_SENSORS_STATIONARY_WINDOW) {
+			float mean = 0.0f;
+
+			for (uint8_t i = 0; i < count; i++) {
+				mean += mags[i];
+			}
+			mean /= count;
+
+			float var = 0.0f;
+
+			for (uint8_t i = 0; i < count; i++) {
+				float d = mags[i] - mean;
+
+				var += d * d;
+			}
+			var /= count;
+
+			atomic_set(&m_stationary, (var < thr * thr) ? 1 : 0);
+		}
+
+		k_sleep(period);
+	}
+}
+
+K_THREAD_DEFINE(stationarity_tid, 1024, stationarity_thread, NULL, NULL, NULL,
+		8, 0, 0);
 
 /* --- Runtime ODR / range configuration ------------------------------------ */
 
