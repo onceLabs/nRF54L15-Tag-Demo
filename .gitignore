@@ -1,1 +1,18 @@
+# Build output
 build*/
+twister-out*/
+
+# OS / editor cruft
+.DS_Store
+*.swp
+*~
+
+# AI agent / assistant files (keep local, out of the shared repo)
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.claude/
+.cursor/
+.cursorrules
+.github/copilot-instructions.md
+.aider*
