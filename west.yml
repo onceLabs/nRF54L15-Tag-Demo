@@ -1,0 +1,38 @@
+# West manifest — nRF54L15 Tag Demo (T2 topology: this repo is the manifest repo).
+#
+# Bootstrap a workspace with:
+#   west init -m https://github.com/onceLabs/nRF54L15-Tag-Demo --mr main <ws>
+#   cd <ws> && west update --narrow -o=--depth=1
+#
+# The import allow-list pulls only the nRF Connect SDK modules this application
+# builds against (derived from the app's compile_commands.json), excluding the
+# large unused stacks (Matter, LVGL, TF-M, OpenThread, Wi-Fi, LoRaMAC, ...).
+manifest:
+  version: "1.0"
+
+  remotes:
+    - name: nrfconnect
+      url-base: https://github.com/nrfconnect
+
+  projects:
+    - name: sdk-nrf
+      remote: nrfconnect
+      repo-path: sdk-nrf
+      revision: v3.4.0
+      import:
+        name-allowlist:
+          - zephyr             # core RTOS
+          - nrfxlib            # SoftDevice Controller + MPSL + crypto libs
+          - hal_nordic         # nrfx + MDK (nRF54L15)
+          - cmsis              # CMSIS core
+          - cmsis_6            # CMSIS 6
+          - cmsis-dsp          # FFT/DSP used by cs_de
+          - mbedtls            # nrf_security backend
+          - oberon-psa-crypto  # PSA crypto (BLE SMP / MCUmgr)
+          - tf-psa-crypto      # NCS 3.4 PSA crypto integration
+          - picolibc           # C library
+          - segger             # RTT (console / log / shell)
+          - zcbor              # MCUmgr / SMP encoding
+
+  self:
+    path: nRF54L15TagDemo

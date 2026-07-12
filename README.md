@@ -70,6 +70,26 @@ Built with the **nRF Connect for VS Code** extension (NCS v3.4.0): board target
 console/log/shell I/O is over SEGGER RTT — open an RTT terminal to interact).
 Build output directories (`build*/`) are gitignored.
 
+### Workspace setup (west)
+
+This repo is also a **west manifest repository** ([west.yml](west.yml), NCS
+v3.4.0 pinned), so it can be bootstrapped into a self-contained, reproducible
+workspace:
+
+```sh
+west init -m https://github.com/onceLabs/nRF54L15-Tag-Demo --mr main my-workspace
+cd my-workspace
+west update --narrow -o=--depth=1     # shallow-clone the allow-listed SDK modules
+west build -b nrf54l15tag/nrf54l15/cpuapp -S rtt-console nRF54L15TagDemo
+west flash
+```
+
+The manifest uses an `import` allow-list to pull only the SDK modules this
+application needs (~2.8 GB working tree vs the full ~4.6 GB NCS); `--narrow
+-o=--depth=1` shallow-clones to reduce the download further. Using the nRF
+Connect VS Code extension against an already-installed NCS works unchanged and
+does not require this step.
+
 ## Runtime control (RTT shell)
 
 Open the RTT console/terminal after flashing. Commands:

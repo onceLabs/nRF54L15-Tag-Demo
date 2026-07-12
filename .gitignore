@@ -2,6 +2,9 @@
 build*/
 twister-out*/
 
+# West workspace metadata (if this repo is used as a workspace topdir)
+.west/
+
 # OS / editor cruft
 .DS_Store
 *.swp
