@@ -19,6 +19,7 @@ manifest:
       remote: nrfconnect
       repo-path: sdk-nrf
       revision: v3.4.0
+      path: nrf              # NCS build glue expects the SDK tree at nrf/
       import:
         name-allowlist:
           - zephyr             # core RTOS
