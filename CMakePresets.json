@@ -1,0 +1,21 @@
+{
+    "version": 2,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 20
+    },
+    "configurePresets": [
+        {
+            "name": "build_cli",
+            "displayName": "Build for nRF54l15 TAG nRF54l15 Application",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build_cli",
+            "cacheVariables": {
+                "BOARD": "nrf54l15tag/nrf54l15/cpuapp",
+                "SNIPPET": "rtt-console",
+                "DEBUG_THREAD_INFO": false,
+                "nRF54L15TagDemo_DEBUG_THREAD_INFO": false
+            }
+        }
+    ]
+}
