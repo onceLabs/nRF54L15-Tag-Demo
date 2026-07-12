@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Custom BLE Motion Service: high-rate accel + gyro streaming via notifications.
  */
 #ifndef APP_MOTION_H_

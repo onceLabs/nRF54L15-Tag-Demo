@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Channel Sounding reflector (peripheral) role.
  */
 #ifndef APP_CS_REFLECTOR_H_

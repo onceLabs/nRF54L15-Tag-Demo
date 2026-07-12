@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Channel Sounding shared core: role/mode state and lifecycle.
  *
  * Both roles (initiator/reflector) and both transports (RAS/IPT) are

@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Bluetooth SIG Environmental Sensing Service (ESS, 0x181A).
  *
  * Exposes the BME688 temperature/humidity/pressure as the standard SIG

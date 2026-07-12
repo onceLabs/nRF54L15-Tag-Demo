@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * nRF54L15 Tag Demo
  *
  * Dual-role, dual-mode (RAS + inline-PCT) Bluetooth Channel Sounding plus
@@ -10,6 +15,7 @@
 
 #include "sensors/sensors.h"
 #include "ble/ble_core.h"
+#include "ble/adv.h"
 #include "cs/cs_shared.h"
 #include "ess/ess.h"
 #include "motion/motion.h"
@@ -31,6 +37,11 @@ int main(void)
 	err = ble_core_init();
 	if (err) {
 		LOG_ERR("ble_core_init failed (%d)", err);
+	}
+
+	err = adv_init();
+	if (err) {
+		LOG_ERR("adv_init failed (%d)", err);
 	}
 
 	err = cs_init();

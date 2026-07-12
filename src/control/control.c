@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Runtime control shell.
  *
  *   cs role <initiator|reflector>
@@ -93,11 +98,37 @@ static int cmd_cs_stop(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+/* Print the latest CS distance in a machine- and human-friendly form:
+ *   "distance mm=653 ft=2 in=1.7"  or  "distance: none" when no fresh fix.
+ */
+static void print_distance(const struct shell *sh)
+{
+	float m;
+
+	if (!cs_get_distance(&m)) {
+		shell_print(sh, "distance: none");
+		return;
+	}
+
+	float total_in = m * 39.3701f;
+	int feet = (int)(total_in / 12.0f);
+
+	shell_print(sh, "distance mm=%d ft=%d in=%.1f", (int)(m * 1000.0f), feet,
+		    (double)(total_in - feet * 12.0f));
+}
+
 static int cmd_cs_status(const struct shell *sh, size_t argc, char **argv)
 {
 	shell_print(sh, "role=%s mode=%s running=%s",
 		    cs_role_str(cs_get_role()), cs_mode_str(cs_get_mode()),
 		    cs_is_running() ? "yes" : "no");
+	print_distance(sh);
+	return 0;
+}
+
+static int cmd_cs_distance(const struct shell *sh, size_t argc, char **argv)
+{
+	print_distance(sh);
 	return 0;
 }
 
@@ -108,6 +139,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(cs_cmds,
 	SHELL_CMD_ARG(start, NULL, "Start ranging", cmd_cs_start, 1, 0),
 	SHELL_CMD_ARG(stop, NULL, "Stop ranging", cmd_cs_stop, 1, 0),
 	SHELL_CMD_ARG(status, NULL, "Show role/mode/running", cmd_cs_status, 1, 0),
+	SHELL_CMD_ARG(distance, NULL, "Show latest CS distance", cmd_cs_distance,
+		      1, 0),
 	SHELL_SUBCMD_SET_END
 );
 

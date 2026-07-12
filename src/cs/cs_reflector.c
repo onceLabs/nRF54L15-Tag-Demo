@@ -1,13 +1,17 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Channel Sounding reflector (peripheral) role.
  *
- * The reflector advertises and lets the initiator drive the CS procedure:
- * it only sets its default CS settings (reflector role) on connect and its
- * procedure parameters once the initiator has created the CS config. The
- * initiator creates the config (including the inline-PCT flag for IPT), so
- * the reflector code is identical for RAS and IPT except the advertising
- * payload — RAS advertises the Ranging Service UUID (and the RRSP GATT
- * server, provided by CONFIG_BT_RAS_RRSP, is auto-allocated on connect).
+ * The reflector lets the initiator drive the CS procedure: it only sets its
+ * default CS settings (reflector role) on connect and its procedure parameters
+ * once the initiator has created the CS config. The initiator creates the
+ * config (including the inline-PCT flag for IPT), so the reflector code is
+ * identical for RAS and IPT. Advertising is owned by the ble adv module
+ * (src/ble/adv.c), not here.
  *
  * CS event callbacks are registered here but gated on the active role so the
  * initiator's callbacks (which share the same events) do not double-handle.
@@ -16,11 +20,8 @@
 #include "cs_shared.h"
 #include "ble_core.h"
 
-#include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/cs.h>
-#include <zephyr/bluetooth/uuid.h>
-#include <bluetooth/services/ras.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_DECLARE(app_cs, CONFIG_LOG_DEFAULT_LEVEL);
@@ -29,41 +30,10 @@ static K_SEM_DEFINE(sem_connected, 0, 1);
 static K_SEM_DEFINE(sem_config, 0, 1);
 
 static bool active;
-static enum cs_mode active_mode;
-
-/* Advertising payloads. Both advertise the Environmental Sensing Service UUID
- * (available in reflector role); RAS additionally advertises the Ranging
- * Service UUID.
- */
-static const struct bt_data ad_ras[] = {
-	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-	BT_DATA_BYTES(BT_DATA_UUID16_ALL,
-		      BT_UUID_16_ENCODE(BT_UUID_RANGING_SERVICE_VAL),
-		      BT_UUID_16_ENCODE(BT_UUID_ESS_VAL)),
-	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME,
-		sizeof(CONFIG_BT_DEVICE_NAME) - 1),
-};
-
-static const struct bt_data ad_ipt[] = {
-	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-	BT_DATA_BYTES(BT_DATA_UUID16_ALL, BT_UUID_16_ENCODE(BT_UUID_ESS_VAL)),
-	BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME,
-		sizeof(CONFIG_BT_DEVICE_NAME) - 1),
-};
 
 static bool reflector_active(void)
 {
 	return active && cs_get_role() == CS_ROLE_REFLECTOR;
-}
-
-static int adv_start(enum cs_mode mode)
-{
-	if (mode == CS_MODE_RAS) {
-		return bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad_ras,
-				       ARRAY_SIZE(ad_ras), NULL, 0);
-	}
-	return bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad_ipt,
-			       ARRAY_SIZE(ad_ipt), NULL, 0);
 }
 
 /* --- CS connection callbacks (gated on reflector role) --------------------- */
@@ -74,20 +44,6 @@ static void connected_cb(struct bt_conn *conn, uint8_t err)
 		return;
 	}
 	k_sem_give(&sem_connected);
-}
-
-static void disconnected_cb(struct bt_conn *conn, uint8_t reason)
-{
-	if (!reflector_active()) {
-		return;
-	}
-
-	/* Resume advertising so the reflector stays discoverable. */
-	int aerr = adv_start(active_mode);
-
-	if (aerr) {
-		LOG_ERR("reflector: re-advertise failed (%d)", aerr);
-	}
 }
 
 static void config_create_cb(struct bt_conn *conn, uint8_t status,
@@ -133,7 +89,6 @@ static void procedure_enable_cb(struct bt_conn *conn, uint8_t status,
 
 BT_CONN_CB_DEFINE(cs_reflector_conn_cbs) = {
 	.connected = connected_cb,
-	.disconnected = disconnected_cb,
 	.le_cs_config_complete = config_create_cb,
 	.le_cs_security_enable_complete = security_enable_cb,
 	.le_cs_procedure_enable_complete = procedure_enable_cb,
@@ -153,9 +108,19 @@ static void reflector_thread(void *p1, void *p2, void *p3)
 
 		k_sem_take(&sem_connected, K_FOREVER);
 
-		conn = ble_current_conn();
+		conn = ble_peripheral_conn();
 		if (!conn) {
 			continue;
+		}
+
+		/* The CS/RAS link must be encrypted (RAS chars are ENCRYPT-gated and
+		 * CS requires an encrypted link). ble_core forces L2 only on central
+		 * links, so as the peripheral we request it here. A plain screen/SMP
+		 * host on an idle/initiator tag is left unencrypted (handled elsewhere).
+		 */
+		err = bt_conn_set_security(conn, BT_SECURITY_L2);
+		if (err) {
+			LOG_WRN("reflector: set security L2 failed (%d)", err);
 		}
 
 		const struct bt_le_cs_set_default_settings_param default_settings = {
@@ -207,28 +172,19 @@ K_THREAD_DEFINE(cs_reflector_tid, 2048, reflector_thread, NULL, NULL, NULL,
 
 int cs_reflector_start(enum cs_mode mode)
 {
-	int err;
-
-	active_mode = mode;
+	/* Advertising (incl. the Ranging UUID payload) is handled by the ble adv
+	 * module, which cs_start() refreshes after this returns.
+	 */
 	active = true;
-
-	err = adv_start(mode);
-	if (err) {
-		LOG_ERR("reflector: advertising start failed (%d)", err);
-		active = false;
-		return err;
-	}
-
-	LOG_INF("reflector: advertising (mode=%s)", cs_mode_str(mode));
+	LOG_INF("reflector: active (mode=%s)", cs_mode_str(mode));
 	return 0;
 }
 
 void cs_reflector_stop(void)
 {
 	active = false;
-	(void)bt_le_adv_stop();
 
-	struct bt_conn *conn = ble_current_conn();
+	struct bt_conn *conn = ble_peripheral_conn();
 
 	if (conn) {
 		bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);

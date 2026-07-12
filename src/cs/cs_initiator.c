@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Channel Sounding initiator (central) role — RAS and inline-PCT (IPT).
  *
  * Ported and merged from the NCS channel_sounding ras_initiator and
@@ -29,6 +34,7 @@
 #include <zephyr/bluetooth/cs.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/conn.h>
+#include <zephyr/bluetooth/hci_types.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <bluetooth/scan.h>
 #include <bluetooth/services/ras.h>
@@ -374,7 +380,7 @@ static void ras_ranging_data_ready_cb(struct bt_conn *conn, uint16_t ranging_cou
 		return;
 	}
 
-	int err = bt_ras_rreq_cp_get_ranging_data(ble_current_conn(), &latest_peer_steps,
+	int err = bt_ras_rreq_cp_get_ranging_data(ble_central_conn(), &latest_peer_steps,
 						  ranging_counter, ras_ranging_data_cb);
 	if (err) {
 		LOG_ERR("Get ranging data failed (err %d)", err);
@@ -610,6 +616,45 @@ static void procedure_enable_cb(struct bt_conn *conn, uint8_t status,
 		params->state == 1 ? "enabled" : "disabled", params->config_id);
 }
 
+#if IS_ENABLED(CONFIG_APP_CS_SHORT_INTERVAL)
+/* Request a sub-7.5 ms (SCI) connection interval on the active link. */
+static void request_short_interval(struct bt_conn *conn)
+{
+	uint16_t units = CONFIG_APP_CS_SHORT_INTERVAL_US / 125;
+	struct bt_conn_le_conn_rate_param p = {
+		.interval_min_125us = units,
+		.interval_max_125us = units,
+		.subrate_min = 1,
+		.subrate_max = 1,
+		.max_latency = 0,
+		.continuation_number = 0,
+		.supervision_timeout_10ms = 400,
+		.min_ce_len_125us = BT_HCI_LE_SCI_CE_LEN_MIN_125US,
+		.max_ce_len_125us = BT_HCI_LE_SCI_CE_LEN_MAX_125US,
+	};
+	int err = bt_conn_le_conn_rate_request(conn, &p);
+
+	if (err) {
+		LOG_WRN("initiator: SCI rate request failed (%d)", err);
+	} else {
+		LOG_INF("initiator: requested SCI interval %u us",
+			CONFIG_APP_CS_SHORT_INTERVAL_US);
+	}
+}
+
+static void conn_rate_changed_cb(struct bt_conn *conn, uint8_t status,
+				 const struct bt_conn_le_conn_rate_changed *params)
+{
+	if (status != BT_HCI_ERR_SUCCESS) {
+		LOG_WRN("conn rate change failed (0x%02x)", status);
+		return;
+	}
+	LOG_INF("conn rate updated: interval %u us, subrate %u, latency %u",
+		params->interval_us, params->subrate_factor,
+		params->peripheral_latency);
+}
+#endif /* CONFIG_APP_CS_SHORT_INTERVAL */
+
 BT_CONN_CB_DEFINE(cs_initiator_conn_cbs) = {
 	.connected = connected_cb,
 	.disconnected = disconnected_cb,
@@ -619,6 +664,9 @@ BT_CONN_CB_DEFINE(cs_initiator_conn_cbs) = {
 	.le_cs_security_enable_complete = cs_security_enable_cb,
 	.le_cs_procedure_enable_complete = procedure_enable_cb,
 	.le_cs_subevent_data_available = subevent_result_cb,
+#if IS_ENABLED(CONFIG_APP_CS_SHORT_INTERVAL)
+	.conn_rate_changed = conn_rate_changed_cb,
+#endif
 };
 
 /* --- GATT discovery (RAS only) -------------------------------------------- */
@@ -914,6 +962,13 @@ static int run_session(struct bt_conn *conn, enum cs_mode mode, uint16_t conn_in
 		return err;
 	}
 
+#if IS_ENABLED(CONFIG_APP_CS_SHORT_INTERVAL)
+	/* Ranging is up on the stable initial interval; now request a shorter
+	 * (sub-7.5 ms) SCI connection interval for faster ranging cadence.
+	 */
+	request_short_interval(conn);
+#endif
+
 	return 0;
 }
 
@@ -927,6 +982,23 @@ static float apply_offset(float m)
 	float v = m + (CONFIG_APP_CS_DISTANCE_OFFSET_MM / 1000.0f);
 
 	return v < 0.0f ? 0.0f : v;
+}
+
+/* Format meters as "F ft I.I in (T.T in)" into buf. Preserves NaN. */
+static const char *fmt_ft_in(char *buf, size_t n, float m)
+{
+	if (!isfinite(m)) {
+		snprintk(buf, n, "nan");
+		return buf;
+	}
+
+	float total_in = m * 39.3701f;
+	int feet = (int)(total_in / 12.0f);
+	float rem_in = total_in - feet * 12.0f;
+
+	snprintk(buf, n, "%d ft %.1f in (%.1f in)", feet,
+		 (double)rem_in, (double)total_in);
+	return buf;
 }
 
 static void print_distances(enum cs_mode mode)
@@ -949,11 +1021,18 @@ static void print_distances(enum cs_mode mode)
 		float phase_slope = apply_offset(d.phase_slope);
 		float rtt = apply_offset(d.rtt);
 
+		char b_ifft[32];
+
 		if (mode == CS_MODE_IPT) {
-			LOG_INF("distance[ap%u]: ifft %.2f m", ap, (double)ifft);
+			LOG_INF("distance[ap%u]: ifft %s", ap,
+				fmt_ft_in(b_ifft, sizeof(b_ifft), ifft));
 		} else {
-			LOG_INF("distance[ap%u]: ifft %.2f  phase_slope %.2f  rtt %.2f m",
-				ap, (double)ifft, (double)phase_slope, (double)rtt);
+			char b_ps[32], b_rtt[32];
+
+			LOG_INF("distance[ap%u]: ifft %s | phase_slope %s | rtt %s",
+				ap, fmt_ft_in(b_ifft, sizeof(b_ifft), ifft),
+				fmt_ft_in(b_ps, sizeof(b_ps), phase_slope),
+				fmt_ft_in(b_rtt, sizeof(b_rtt), rtt));
 		}
 
 		/* Publish antenna path 0's ifft distance for the LED UX. */
@@ -994,7 +1073,7 @@ static void initiator_thread(void *p1, void *p2, void *p3)
 			continue; /* re-check active / keep scanning */
 		}
 
-		struct bt_conn *conn = ble_current_conn();
+		struct bt_conn *conn = ble_central_conn();
 
 		if (!conn) {
 			continue; /* disconnected wake-up */
@@ -1007,7 +1086,7 @@ static void initiator_thread(void *p1, void *p2, void *p3)
 
 		if (err) {
 			LOG_WRN("initiator: session setup failed (%d)", err);
-			if (ble_current_conn()) {
+			if (ble_central_conn()) {
 				bt_conn_disconnect(conn,
 						   BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 			}
@@ -1017,7 +1096,7 @@ static void initiator_thread(void *p1, void *p2, void *p3)
 		LOG_INF("initiator: ranging (mode=%s)", cs_mode_str(active_mode));
 
 		/* Report until disconnect or stop. */
-		while (initiator_active() && ble_current_conn()) {
+		while (initiator_active() && ble_central_conn()) {
 			if (k_sem_take(&sem_distance_estimate_updated, K_MSEC(500)) == 0) {
 				print_distances(active_mode);
 			}
@@ -1026,7 +1105,7 @@ static void initiator_thread(void *p1, void *p2, void *p3)
 		/* Session ended (disconnect). Resume scanning if still active
 		 * — bt_scan auto-connect stops the scanner on connection.
 		 */
-		if (initiator_active() && !ble_current_conn()) {
+		if (initiator_active() && !ble_central_conn()) {
 			int serr = bt_scan_start(BT_SCAN_TYPE_SCAN_PASSIVE);
 
 			if (serr && serr != -EALREADY) {
@@ -1070,7 +1149,7 @@ void cs_initiator_stop(void)
 	active = false;
 	bt_scan_stop();
 
-	struct bt_conn *conn = ble_current_conn();
+	struct bt_conn *conn = ble_central_conn();
 
 	if (conn) {
 		bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);

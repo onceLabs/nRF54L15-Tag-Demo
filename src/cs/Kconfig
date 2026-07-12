@@ -43,13 +43,15 @@ config APP_CS_AUTOSTART
 
 config APP_CS_DISTANCE_OFFSET_MM
 	int "Static distance calibration offset (mm), added to every estimate"
-	default -914
+	default -1610
 	range -10000 10000
 	help
 	  Fixed RF/antenna-path bias correction added to each distance estimate
-	  before it is logged/reported. Default -914 mm (approx -3 ft) cancels
-	  the ~1 m bias two adjacent tags report. The corrected value is clamped
-	  to be non-negative.
+	  before it is logged/reported. Default -1855 mm was measured from two
+	  tags 12 in (0.305 m) apart, which report a median ifft distance of
+	  ~2.16 m; the offset cancels that ~1.85 m bias. Note this is a single
+	  constant and won't be exact at other distances. The corrected value is
+	  clamped to be non-negative.
 
 config APP_CS_STABILIZE
 	bool "Accelerometer-assisted distance stabilization"
@@ -78,5 +80,23 @@ config APP_CS_STAB_WINDOW_MOVING
 	  the full window.
 
 endif # APP_CS_STABILIZE
+
+config APP_CS_SHORT_INTERVAL
+	bool "Request a shorter (SCI) connection interval as CS initiator"
+	default y
+	depends on BT_SHORTER_CONNECTION_INTERVALS
+	help
+	  After ranging starts, the initiator (central) requests a sub-7.5 ms
+	  connection interval via the Shorter Connection Intervals feature. Only
+	  effective tag<->tag (both ends SCI-capable).
+
+config APP_CS_SHORT_INTERVAL_US
+	int "Target SCI connection interval (microseconds)"
+	default 3750
+	range 1250 7500
+	depends on APP_CS_SHORT_INTERVAL
+	help
+	  Sub-7.5 ms; 3750 us (3.75 ms) leaves room for CS subevents. Lower toward
+	  1250 us if CS stays stable.
 
 endif # APP_CS

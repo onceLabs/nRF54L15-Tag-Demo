@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Onboard sensor sampling module.
  *
  *   env0   = BME688 environmental (bosch,bme680 driver) — temp/press/humidity/gas

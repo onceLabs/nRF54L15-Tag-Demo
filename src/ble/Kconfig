@@ -5,3 +5,12 @@ config APP_BLE_CORE
 	help
 	  Brings up the Bluetooth stack and provides shared connection and
 	  security callbacks used by the Channel Sounding modules.
+
+config APP_ADV
+	bool "Role-independent connectable advertising"
+	default y
+	depends on BT_PERIPHERAL && APP_CS
+	help
+	  Owns the single connectable advertiser so the tag is discoverable for
+	  the phone-facing services (ESS/Motion/SMP) whenever idle or acting as a
+	  reflector, not only during CS ranging.

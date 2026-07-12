@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Button + RGB-LED UX for the two-tag Channel Sounding demo.
  */
 #ifndef APP_UX_H_

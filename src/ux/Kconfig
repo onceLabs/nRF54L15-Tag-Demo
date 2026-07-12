@@ -9,16 +9,42 @@ config APP_UX
 
 if APP_UX
 
+config APP_UX_SHORT_DEMO
+	bool "Short-distance demo LED mapping (1-3 ft)"
+	default n
+	help
+	  Remap the LED distance zones to a 1-3 ft span (green <1 ft, yellow
+	  1-3 ft, red beyond) for close-range demos, instead of the default
+	  multi-meter mapping. Also tightens the blink range so movement within
+	  1-3 ft is visibly reactive (the blink period is interpolated across the
+	  near..far span).
+
 config APP_UX_NEAR_MM
 	int "Near/mid distance threshold (mm)"
+	default 305 if APP_UX_SHORT_DEMO
 	default 1000
 	help
 	  Distance below this shows green.
 
 config APP_UX_FAR_MM
 	int "Mid/far distance threshold (mm)"
+	default 914 if APP_UX_SHORT_DEMO
 	default 3000
 	help
 	  Distance below this shows yellow; at or above, red.
+
+config APP_UX_BLINK_FAST_MS
+	int "Blink period at contact (ms, fastest)"
+	default 120
+	help
+	  Blink period when the tags are touching (distance 0). The period is
+	  interpolated up to APP_UX_BLINK_SLOW_MS at the far threshold, so closer
+	  blinks faster.
+
+config APP_UX_BLINK_SLOW_MS
+	int "Blink period at/after the far threshold (ms, slowest)"
+	default 1200
+	help
+	  Blink period at (and beyond) APP_UX_FAR_MM.
 
 endif # APP_UX

@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Channel Sounding shared core.
  *
  * Phase 0: state + lifecycle skeleton. Phase 3/4 fill in the CS handshake
@@ -8,6 +13,7 @@
 #include "cs_shared.h"
 #include "cs_initiator.h"
 #include "cs_reflector.h"
+#include "adv.h"
 
 #include <math.h>
 #include <zephyr/logging/log.h>
@@ -134,6 +140,7 @@ int cs_start(void)
 	}
 
 	m_running = true;
+	adv_refresh(); /* reflect the new role in advertising */
 	return 0;
 }
 
@@ -146,6 +153,7 @@ int cs_stop(void)
 	(m_role == CS_ROLE_INITIATOR) ? cs_initiator_stop() : cs_reflector_stop();
 	m_running = false;
 	m_distance = NAN;
+	adv_refresh(); /* back to idle advertising */
 	LOG_INF("cs: stopped");
 	return 0;
 }

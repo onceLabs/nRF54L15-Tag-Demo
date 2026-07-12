@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Distance-estimate post-processing: per-antenna-path sliding-window median.
  * Ported from the ras_initiator reference (get_distance / median_inplace).
  */

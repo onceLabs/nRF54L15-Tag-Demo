@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Custom BLE Motion Service (128-bit vendor UUID).
  *
  * Two notify characteristics — accelerometer and gyroscope — stream the
@@ -148,7 +153,7 @@ BT_GATT_SERVICE_DEFINE(motion_svc,
 
 static void request_fast_interval(void)
 {
-	struct bt_conn *conn = ble_current_conn();
+	struct bt_conn *conn = ble_peripheral_conn();
 
 	if (!conn) {
 		return;
@@ -231,7 +236,7 @@ static int notify_chan(uint8_t attr_idx, uint8_t *buf, uint8_t count)
 
 static uint8_t mtu_sample_cap(void)
 {
-	struct bt_conn *conn = ble_current_conn();
+	struct bt_conn *conn = ble_peripheral_conn();
 	uint16_t mtu = conn ? bt_gatt_get_mtu(conn) : 23;
 	uint32_t cap = (mtu > 4) ? (mtu - 3 - 1) / SAMPLE_WIRE_SIZE : 1;
 

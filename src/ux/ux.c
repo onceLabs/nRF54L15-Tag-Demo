@@ -1,4 +1,9 @@
 /*
+ * Copyright (c) 2026 onceLabs
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+/*
  * Button + RGB-LED UX for the two-tag Channel Sounding demo.
  *
  * Button (sw0) cycles the CS role: Off -> Reflector -> Initiator -> Off.
@@ -99,9 +104,20 @@ static void distance_color(float m, bool *r, bool *g, bool *b)
 
 static uint32_t distance_period_ms(float m)
 {
-	int32_t p = (int32_t)(200.0f + m * 300.0f); /* closer = faster */
+	/* Interpolate the blink period from FAST (at contact) to SLOW (at the far
+	 * threshold), so reactivity tracks whatever near/far mapping is active —
+	 * tight and reactive in short-demo, gentle in the default multi-meter map.
+	 */
+	float far_m = CONFIG_APP_UX_FAR_MM / 1000.0f;
+	float t = (far_m > 0.0f) ? (m / far_m) : 1.0f; /* 0 at contact .. 1 at far */
 
-	return (uint32_t)CLAMP(p, 200, 2000);
+	t = CLAMP(t, 0.0f, 1.0f);
+
+	int32_t p = (int32_t)(CONFIG_APP_UX_BLINK_FAST_MS +
+			      t * (CONFIG_APP_UX_BLINK_SLOW_MS -
+				   CONFIG_APP_UX_BLINK_FAST_MS));
+
+	return (uint32_t)p;
 }
 
 static void led_thread(void *p1, void *p2, void *p3)
