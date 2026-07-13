@@ -21,6 +21,7 @@
 
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/reboot.h>
 #include <dk_buttons_and_leds.h>
 
 LOG_MODULE_REGISTER(app_ux, CONFIG_LOG_DEFAULT_LEVEL);
@@ -79,11 +80,16 @@ static void button_handler(uint32_t button_state, uint32_t has_changed)
 	}
 
 	enum ux_role cur = (enum ux_role)atomic_get(&m_role);
-	enum ux_role next = (cur == UX_OFF)       ? UX_REFLECTOR :
-			    (cur == UX_REFLECTOR) ? UX_INITIATOR :
-						    UX_OFF;
 
-	apply_role(next);
+	/* Off -> Reflector -> Initiator -> (full reboot). */
+	if (cur == UX_INITIATOR) {
+		LOG_INF("ux: reboot");
+		k_msleep(50); /* let the deferred RTT log flush */
+		sys_reboot(SYS_REBOOT_COLD);
+		return; /* not reached */
+	}
+
+	apply_role(cur == UX_OFF ? UX_REFLECTOR : UX_INITIATOR);
 }
 
 /* --- LED indicator thread ------------------------------------------------- */
